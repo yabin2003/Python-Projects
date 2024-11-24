@@ -1,6 +1,9 @@
-
 from pymongo import MongoClient
 from tabulate import tabulate as tb
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from datetime import datetime
+import os
 
 # Menu
 menu = {
@@ -63,6 +66,15 @@ menu = {
     "Kachori": 25
 }
 
+
+#View menu
+def view_menu():
+    h=["Items","Price"]
+    d=[]
+    for item,price in menu.items():
+        d.append((item,price))
+    print(tb(d,headers=h,tablefmt="grid"))
+
 # Ordering items:
 
 def order():
@@ -72,12 +84,16 @@ def order():
     i1=input("First item: ")
     if i1 in menu:
         bill+=menu[i1]
-    more=input("Do you want to order anything? (Y or N): ")
+    else:
+        print(f"Sorry! , We don't have {i1} on the menu")
+    more=input("Do you want to order anything? (Y or N): ").upper()
     while more=="Y":
         i2=input("What do you like to order?: ")
         if i2 in menu:
             bill+=menu[i2]
-        more=input("Do you need anything?: (Y or N) ")
+        else:
+            print(f"Sorry! , We don't have {i2} on the menu")
+        more=input("Do you need anything?: (Y or N) ").upper()
     else:
         print(f"Thank you for ordering ! This is your bill amount - {bill}")
     dt=[]
@@ -97,4 +113,64 @@ def order():
     result=c.insert_one(data)
     print(tb(dt,headers=headers,tablefmt="grid"))
 
-order()
+# Generate pdf bill
+
+def generate_pdf_bill():
+    # Fetching customer name and bill from MongoDB (use the name from the order or the last entry)
+    client = MongoClient("mongodb://localhost:27017/")
+    db = client["Food_Order_System"]
+    c = db["Customer_Data"]
+    last_order = c.find().sort("_id", -1).limit(1)[0]  # Get the most recent order
+    customer_name = last_order["Name"]
+    total_bill = last_order["Total_Bill"]
+    pdf_filename = f"order_bill_{customer_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+
+    c = canvas.Canvas(pdf_filename, pagesize=letter)
+    width, height = letter
+
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(200, height - 50, "YJ Restaurant - Order Bill")
+    c.setFont("Helvetica", 12)
+    c.drawString(30, height - 100, f"Customer Name: {customer_name}")
+    c.drawString(30, height - 120, f"Order Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(30, height - 160, f"Total Bill: Rs. {total_bill}")
+    c.setFont("Helvetica-Oblique", 10)
+    c.drawString(30, 50, "Thank you for dining with us! Visit us again.")
+    c.setFont("Helvetica", 8)
+    c.drawString(30, 30, "Address: YJ Restaurant, Coimbatore")
+
+    c.save()  # save the pdf
+
+    print(f"\nPDF bill generated: {pdf_filename}")
+    if os.name == 'posix':
+        os.system(f'open {pdf_filename}')
+    elif os.name == 'nt':
+        os.system(f'start {pdf_filename}')
+    else:
+        print("Could not open the PDF automatically. Please open it manually.")
+
+# Main
+
+def main():
+    while True:
+        print("\n Welcome to YJ restaurant\n")
+        print("1. View Menu")
+        print("2. Order items")
+        print("3. Generate Pdf bill")
+        print("4. Exit\n")
+        choice=input("Enter your choice (1-3): ")
+        if choice=='1':
+            view_menu()
+        elif choice=='2':
+            order()
+        elif choice=='3':
+            generate_pdf_bill()
+        elif choice=='4':
+            print("Thank You for visiting our restaurant! Have a great day!")
+            break
+
+main()
+
+
+
