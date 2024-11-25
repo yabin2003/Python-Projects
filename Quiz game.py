@@ -1,5 +1,8 @@
 from tabulate import tabulate as tb
 from pymongo import MongoClient
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
 
 def quiz(questions):
     n=len(questions)
@@ -38,6 +41,12 @@ def quiz(questions):
     result = collection.insert_one(mongo_data)
 
     print("Your Marks are recorded...")
+
+    choice=input("Do you want to generate the users_data pdf? (Y or N) : ").upper()
+    if choice=="Y":
+        generate_pdf()
+    else:
+        pass
 
 questions = [
     {
@@ -217,6 +226,34 @@ questions = [
     }
 ]   # Questions(35)
 
+def generate_pdf():
+
+    client = MongoClient("mongodb://localhost:27017/")
+    db = client["Quiz_game"]
+    collection = db["user_data"]
+    users=collection.find()
+
+    pdf="users_data.pdf"
+
+    c=canvas.Canvas(pdf,pagesize=letter)
+
+    c.setFont("Helvetica",25)
+    c.drawString(105,720,"-------------Quiz-Game Report-------------")
+
+    c.drawString(50, 650, "Name")
+    c.drawString(250, 650, "Age")
+    c.drawString(450, 650, "Score")
+
+    y_position = 600
+    for user in users:
+        c.drawString(50, y_position, user["Name"])
+        c.drawString(270, y_position, str(user["Age"]))
+        c.drawString(450, y_position, str(user["Marks"]))
+        y_position -= 40
+    c.save()
+    print(f"PDF generated successfully: {pdf}")
+
 quiz(questions)
+
 
 
